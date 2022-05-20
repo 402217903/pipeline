@@ -1,0 +1,166 @@
+
+
+def project_tag=[:]
+// def project_list=["HanddayRetail.MallApi":"handdayretail","HanddayRetail.MpWeixinApi":"handdayretail","HanddayRetail.ProductApi":"handdayretail","HanddayRetail.TaskJob":"handdayretail","HanddayRetail.PayApi":"handdayretail"]
+def project_list=["HanddayRetail.MallApi":"handdayretail","HanddayRetail.MpWeixinApi":"handdayretail","HanddayRetail.ProductApi":"handdayretail","HanddayRetail.TaskJob":"handdayretail","HanddayRetail.PayApi":"handdayretail","HanddayRetail.WechatWorkApi":"handdayretail"]
+def projectsrc_list=["handdayretail":"http://gitlab.facehand.cn/hgw/handdayretail.git"]
+def projects_list="$project".split(',')
+def projectsrcs=[]
+def image_tag=[:]
+
+
+projects_list.each{
+    projectsrcs.add("${project_list[(it)]}")
+}
+
+node("chengdu_node"){
+    
+    
+    projectsrcs.unique().each{
+        if ("${ fileExists it }"=="false"){
+            sh label: '', script: "mkdir -p $it"
+        }
+
+        def project_base_name="$it/"
+        
+        dir("$it"){
+            stage('Build'){
+            def a="$Branch"
+            def b=a.split("/")[1]
+            echo "$b"
+            git branch: "$b", credentialsId: '957ca79a-205d-4e70-816f-d09d716fc699', url: "${projectsrc_list[(it)]}"
+            def project_dockerfile=sh(script: "/opt/go/zztx_cli/main find --src /data/jenkins/workspace/Handdayretail_test_k8s/$it/  --fn Dockerfile", returnStdout:true).trim()
+            def project_dockerfiles="$project_dockerfile".split('\n')
+            
+            projects_list.each{
+                def project_name="$it"
+                echo "$project_name"
+                project_dockerfiles.each{
+
+                    if ("$it".contains("$project_name")){
+                        def new_project_name="$project_name".toLowerCase()
+                        def dockerfile_path= "${it.split(project_base_name)[1]}"
+                        
+                        
+              getDatabaseConnection(type: 'GLOBAL') {
+							sql(sql: "use Jenkins;")
+							def res_version = sql(sql: "SELECT version_res  FROM  grpcverinfo where project_name='$project_name' ORDER BY Id DESC LIMIT 1;")
+							println "release verison is : ${res_version}"
+							def restemp = res_version[0]
+							echo "$restemp"
+							def res_tag = restemp.version_res
+							echo "$res_tag"
+
+							def fix_version = sql(sql: "SELECT version_fix  FROM  grpcverinfo where project_name='$project_name' ORDER BY Id DESC LIMIT 1;")
+							println "fix verison is : ${fix_version}"
+							def fixtemp = fix_version[0]
+							echo "$fixtemp"
+							def fix_tag = fixtemp.version_fix
+							echo "$fix_tag"
+
+							def rc_version = sql(sql: "SELECT version_rc  FROM  grpcverinfo where project_name='$project_name' ORDER BY Id DESC LIMIT 1;")
+							println "rc verison is : ${rc_version}"
+							def rctemp = rc_version[0]
+							echo "$rctemp"
+							def rc_tag = rctemp.version_rc
+							echo "$rc_tag"
+
+
+							res_versiontag = res_tag.toInteger()
+							fix_versiontag = fix_tag.toInteger()
+							rc_versiontag = rc_tag.toInteger()
+							if ("$closing" == "true"){
+								res_versiontag = res_tag.toInteger() + 1
+								sql(sql: "INSERT INTO grpcverinfo(Id,project_name,version_res,version_rc,version_fix, version_title, DataUpdateTime) VALUES(DEFAULT, '${project_name}',${res_versiontag},0,0,DEFAULT,NOW());")
+							}
+							if ("$fix_bug" == "true"){
+								rc_versiontag = rc_tag.toInteger()
+								fix_versiontag = fix_tag.toInteger() + 1
+								sql(sql: "INSERT INTO grpcverinfo(Id,project_name,version_res,version_rc,version_fix, version_title, DataUpdateTime) VALUES(DEFAULT, '${project_name}',${res_versiontag},${rc_versiontag},${fix_versiontag},DEFAULT,NOW());")
+							}
+
+							echo "==========================================="
+							echo "rc versiontag : $rc_tag"
+							rc_version = sql(sql: "SELECT version_rc  FROM  grpcverinfo where project_name='$project_name' ORDER BY Id DESC LIMIT 1;")
+							println "rc verison is : ${rc_version}"
+							rctemp = rc_version[0]
+							echo "$rctemp"
+							rc_tag = rctemp.version_rc
+							echo "$rc_tag"
+							rc_versiontag = rc_tag.toInteger() + 1  
+							echo "rc tag : $rc_versiontag"
+							fix_version = sql(sql: "SELECT version_fix  FROM  grpcverinfo where project_name='$project_name' ORDER BY Id DESC LIMIT 1;")
+							println "fix verison is : ${fix_version}"
+							fixtemp = fix_version[0]
+							fix_tag = fixtemp.version_fix
+							fix_versiontag = fix_tag.toInteger()
+							echo "------------------------------------------------"
+							echo "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							echo "${project_name}"
+							sql(sql: "INSERT INTO grpcverinfo(Id,project_name, version_res,version_rc,version_fix, version_title, DataUpdateTime) VALUES(DEFAULT, '${project_name}',${res_versiontag},${rc_versiontag},${fix_versiontag},DEFAULT,NOW());")
+						}
+							
+						full_tag = "v${res_versiontag}-rc${rc_versiontag}"
+						if ("$closing" == "true"){
+							full_tag = "v${res_versiontag}"
+						}
+						if ("$fix_bug" == "true"){
+							full_tag = "v${res_versiontag}-fix${fix_versiontag}"
+						}
+						echo "full_tag = $full_tag"
+                        
+                        image_tag["$new_project_name"]="$full_tag"
+                        project_tag."${new_project_name}"="${full_tag}"
+                        sh(script: """
+                        docker build -f $dockerfile_path -t handday.tencentcloudcr.com/handday/$new_project_name:$full_tag .""")
+                      
+                           sh(script:"docker push handday.tencentcloudcr.com/handday/$new_project_name:$full_tag")
+                      
+                        
+                       
+                    }
+                }
+            }
+           
+        }
+        
+    }
+    
+    }
+    
+}
+node("k8s-master-test"){
+    
+    
+    sh "pwd"
+    dir("$zztx_hostenv/"){
+     stage('部署'){
+
+        sh "pwd"
+        projects_list.each{
+        
+            def project_name="${it}".toLowerCase()
+            echo "$image_tag  $project_name" 
+
+            def tag="${image_tag[(project_name)]}" 
+            
+            sh(script:"helm repo update")
+            sh(script:
+                "project_name=${project_name};"+
+                "config_name=$project_name\".values.yaml\";"+
+                "image_tag=${tag};"+
+                '''helm_chart_name=$(echo $project_name| awk -F \'.\' \'BEGIN{a=""}{i=1;i<NF}{a=a$i"-";i++}{print a$NF}\' );
+                    new_helm_chart_name=$helm_chart_name"-"$zztx_hostenv
+                if [  -n "$(helm list | grep $new_helm_chart_name)" ]; then
+                    helm upgrade --set image.tag=$image_tag  ${new_helm_chart_name}  handday-${zztx_hostenv}/$project_name
+    
+                else
+                    helm install --set image.tag=$image_tag  ${new_helm_chart_name}  handday-${zztx_hostenv}/$project_name
+                fi
+                '''
+                )
+        }
+
+    }
+    }
+}
