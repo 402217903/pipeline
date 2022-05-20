@@ -1,0 +1,65 @@
+before_script:
+  - echo "begin to xkh5  build pages"
+   
+after_script:
+  - echo "finish to xkh5  build pages "
+
+buildmaster:
+  stage: build
+  script:
+    - mkdir -p /mnt/forgitpublish/ubqdxkh5/forpre
+    - tar -zcf xkh5.tar.gz ./* --exclude=.idea --exclude=.project 
+    - md5sum xkh5.tar.gz
+    - \cp xkh5.tar.gz   /mnt/forgitpublish/ubqdxkh5/forpre/
+
+    - sh /mnt/forgitpublish/ubqdxkh5/ubqdxkh5pre.sh
+
+  artifacts:
+    expire_in: 2 day
+    name: "$CI_COMMIT_REF_NAME" 
+    paths:
+      - ./xkh5.tar.gz
+
+  only: 
+    refs:
+     - pre
+
+builddevlop:
+  stage: build
+  script:
+    - mkdir -p /mnt/forgitpublish/ubqdxkh5/fortest/
+    - tar -zcf xkh5.tar.gz ./* --exclude=.idea --exclude=.project 
+    - md5sum xkh5.tar.gz
+    - \cp xkh5.tar.gz   /mnt/forgitpublish/ubqdxkh5/fortest/
+    - sh /mnt/forgitpublish/ubqdxkh5/ubqdxkh5test.sh
+    
+  artifacts:
+    expire_in: 30 min
+    name: "$CI_COMMIT_REF_NAME" 
+    paths:
+      - ./xkh5.tar.gz
+
+    
+  only: 
+    refs:
+     - dev
+
+buildrelease:
+  stage: build
+  script:
+    - mkdir -p /mnt/forgitpublish/ubqdxkh5/foronline
+    - tar -zcf xkh5.tar.gz ./* --exclude=.idea --exclude=.project 
+    - md5sum xkh5.tar.gz
+    - \cp xkh5.tar.gz   /mnt/forgitpublish/ubqdxkh5/foronline/
+    - sh /mnt/forgitpublish/ubqdxkh5/ubqdxkh5online.sh
+  
+  artifacts:
+    expire_in: 2  weeks
+    name: "$CI_COMMIT_REF_NAME" 
+    paths:
+      - ./xkh5.tar.gz
+    
+  only: 
+    refs:
+     - release
+    

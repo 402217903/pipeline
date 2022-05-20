@@ -1,0 +1,89 @@
+before_script:
+  - echo "begin to  build"
+
+after_script:
+  - echo "finish to  build"
+
+variables:
+  NPUBVERSION: 5.0.0
+  NPUBZUULVERSION: 0.0.1
+  CPUBVERSION: 1.0.0
+  PUBDIRVERSION: 50
+
+
+builddevelop:
+  stage: build
+  script:
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkoverlod.sh
+    - mvn package
+    
+  only:
+    refs:
+      - develop
+
+builddev:
+  stage: build
+  script:
+    
+    - mkdir -p /mnt/forgitpublish/ubdzzyxk/test/
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkoverlod.sh
+
+    - mvn package
+    
+    - md5sum ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar
+    - md5sum ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar
+    
+    - mv ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/test/
+    - mv ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/test/
+
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkpublishtest.sh
+
+
+  only:
+    refs:
+      - test
+
+buildmaster:
+  stage: build
+  script:
+    - mkdir -p /mnt/forgitpublish/ubdzzyxk/pre/
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkoverlod.sh
+
+    - mvn package
+    - md5sum ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar
+    - md5sum ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar    
+
+    - mv ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/pre/
+    - mv ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/pre/
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkpublishpre.sh
+
+  only:
+    refs:
+      - pre
+
+buildrelease:
+  stage: build
+  script:
+    - mkdir -p /mnt/forgitpublish/ubdzzyxk/online/
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkoverlod.sh
+
+    - mvn package
+    - md5sum ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar
+    - md5sum ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar       
+
+    
+    - mv ./subject-server/target/subject-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/online/
+    - mv ./profession-server/target/profession-server-$CPUBVERSION-SNAPSHOT.jar   /mnt/forgitpublish/ubdzzyxk/online/
+
+
+    - sh /mnt/forgitpublish/ubdzzyxk/dzzyxkpublishonline.sh
+
+  only:
+    refs:
+      - release
+
